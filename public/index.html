@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>📚 Biblioteca</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles-green.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
@@ -20,6 +20,18 @@
       <div class="header-actions">
         <input id="search-input" type="search" placeholder="Buscar por título o autor..." aria-label="Buscar libros">
       </div>
+    </div>
+    <!-- Onda decorativa -->
+    <div class="header-wave" aria-hidden="true">
+      <svg viewBox="0 0 1400 120" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="g1" x1="0%" x2="100%" y1="0%" y2="0%">
+            <stop offset="0%" stop-color="#0fa37a" stop-opacity="0.95" />
+            <stop offset="100%" stop-color="#0b8b5f" stop-opacity="0.95" />
+          </linearGradient>
+        </defs>
+        <path d="M0,32 C160,120 300,8 600,32 C900,56 1040,4 1400,48 L1400 0 L0 0 Z" fill="url(#g1)"></path>
+      </svg>
     </div>
   </header>
 
@@ -73,10 +85,6 @@
       </section>
     </div>
   </main>
-
-  <footer>
-    Hecho para alumnos • Node + Express + MySQL
-  </footer>
 
   <!-- Toasts / notificaciones -->
   <div id="toast-container" aria-live="polite" aria-atomic="true"></div>
