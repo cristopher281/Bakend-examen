@@ -8,15 +8,22 @@ const inputTitulo = document.getElementById("titulo");
 const selectAutor = document.getElementById("autorId");
 const btnReset = document.getElementById("reset-btn");
 const btnReload = document.getElementById("reload-btn");
+const toastContainer = document.getElementById("toast-container");
+const searchInput = document.getElementById("search-input");
 
 function renderRows(books) {
   tbody.innerHTML = "";
+  if (!books || books.length === 0) {
+    document.getElementById("empty-state").hidden = false;
+    return;
+  }
+  document.getElementById("empty-state").hidden = true;
   for (const b of books) {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${b.id}</td>
-      <td>${b.titulo}</td>
-      <td>${b.autorNombre ?? ""}</td>
+      <td>${escapeHtml(b.titulo)}</td>
+      <td>${escapeHtml(b.autorNombre ?? "")}</td>
       <td>
         <div class="action-buttons">
           <button class="btn btn-sm btn-edit" data-id="${b.id}">Editar</button>
@@ -28,21 +35,45 @@ function renderRows(books) {
   }
 }
 
+function escapeHtml(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 async function loadBooks() {
-  const res = await fetch(API);
-  const data = await res.json();
-  renderRows(data);
+  const q = searchInput?.value?.trim();
+  btnReload?.setAttribute("disabled", "true");
+  try {
+    const res = await fetch(API);
+    if (!res.ok) throw new Error("Error al cargar libros");
+    const data = await res.json();
+    // filtro simple en el cliente (rápido y evita cambios en API)
+    const filtered = data.filter(b => {
+      if (!q) return true;
+      const t = `${b.titulo} ${b.autorNombre ?? ""}`.toLowerCase();
+      return t.includes(q.toLowerCase());
+    });
+    renderRows(filtered);
+  } catch (err) {
+    showToast(err.message || "Error cargando libros", "error");
+  } finally {
+    btnReload?.removeAttribute("disabled");
+  }
 }
 
 async function loadAutores() {
-  const res = await fetch(API_AUTORES);
-  const autores = await res.json();
-  selectAutor.innerHTML = "";
-  for (const a of autores) {
-    const opt = document.createElement("option");
-    opt.value = a.id;
-    opt.textContent = a.nombre;
-    selectAutor.appendChild(opt);
+  try {
+    const res = await fetch(API_AUTORES);
+    if (!res.ok) throw new Error("Error al cargar autores");
+    const autores = await res.json();
+    selectAutor.innerHTML = "<option value=\"\">-- Seleccionar --</option>";
+    for (const a of autores) {
+      const opt = document.createElement("option");
+      opt.value = a.id;
+      opt.textContent = a.nombre;
+      selectAutor.appendChild(opt);
+    }
+  } catch (err) {
+    showToast("No se pudieron cargar los autores", "error");
   }
 }
 
@@ -62,11 +93,17 @@ tbody.addEventListener("click", async (e) => {
   if (t.matches(".btn-danger")) {
     const id = t.getAttribute("data-id");
     if (!confirm("¿Eliminar este libro?")) return;
-    const res = await fetch(`${API}/${id}`, { method: "DELETE" });
-    if (res.ok) {
-      await loadBooks();
-    } else {
-      alert("Error al eliminar libro");
+    try {
+      const res = await fetch(`${API}/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        showToast("Libro eliminado", "success");
+        await loadBooks();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        showToast(err.message || "Error al eliminar libro", "error");
+      }
+    } catch (err) {
+      showToast("Error al eliminar libro", "error");
     }
   }
 });
@@ -79,19 +116,25 @@ form.addEventListener("submit", async (e) => {
   };
   const id = inputId.value;
   const isEdit = Boolean(id);
-  const res = await fetch(isEdit ? `${API}/${id}` : API, {
-    method: isEdit ? "PUT" : "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-
-  if (res.ok) {
-    form.reset();
-    inputId.value = "";
-    await loadBooks();
-  } else {
-    const { message } = await res.json().catch(() => ({ message: "Error" }));
-    alert(message || "Ocurrió un error");
+  if (!payload.titulo) return showToast("El título es obligatorio", "error");
+  if (!payload.autorId) return showToast("Selecciona un autor", "error");
+  try {
+    const res = await fetch(isEdit ? `${API}/${id}` : API, {
+      method: isEdit ? "PUT" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (res.ok) {
+      form.reset();
+      inputId.value = "";
+      showToast(isEdit ? "Libro actualizado" : "Libro agregado", "success");
+      await loadBooks();
+    } else {
+      const { message } = await res.json().catch(() => ({ message: "Error" }));
+      showToast(message || "Ocurrió un error", "error");
+    }
+  } catch (err) {
+    showToast("Error al guardar libro", "error");
   }
 });
 
@@ -101,5 +144,18 @@ btnReset.addEventListener("click", () => {
 });
 
 btnReload.addEventListener("click", loadBooks);
+
+searchInput?.addEventListener("input", () => loadBooks());
+
+function showToast(message, type = "success", timeout = 3500) {
+  if (!toastContainer) return alert(message);
+  const t = document.createElement("div");
+  t.className = `toast ${type === 'error' ? 'error' : 'success'}`;
+  t.innerHTML = `<div class="msg">${escapeHtml(message)}</div><div class="close" aria-label="cerrar">&times;</div>`;
+  toastContainer.appendChild(t);
+  const closer = () => t.remove();
+  t.querySelector('.close').addEventListener('click', closer);
+  setTimeout(() => { t.remove(); }, timeout);
+}
 
 Promise.all([loadAutores(), loadBooks()]);
