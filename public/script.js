@@ -11,7 +11,7 @@ const btnReload = document.getElementById("reload-btn");
 const toastContainer = document.getElementById("toast-container");
 const searchInput = document.getElementById("search-input");
 
-function renderRows(books) {
+function renderRows(books, highlightId = null) {
   tbody.innerHTML = "";
   if (!books || books.length === 0) {
     document.getElementById("empty-state").hidden = false;
@@ -31,6 +31,10 @@ function renderRows(books) {
         </div>
       </td>
     `;
+    if (String(b.id) === String(highlightId)) {
+      tr.classList.add('row-highlight', 'animate-pop-in');
+      setTimeout(() => tr.classList.remove('animate-pop-in'), 1200);
+    }
     tbody.appendChild(tr);
   }
 }
@@ -39,7 +43,7 @@ function escapeHtml(s) {
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-async function loadBooks() {
+async function loadBooks(highlightId = null) {
   const q = searchInput?.value?.trim();
   btnReload?.setAttribute("disabled", "true");
   try {
@@ -52,7 +56,7 @@ async function loadBooks() {
       const t = `${b.titulo} ${b.autorNombre ?? ""}`.toLowerCase();
       return t.includes(q.toLowerCase());
     });
-    renderRows(filtered);
+    renderRows(filtered, highlightId);
   } catch (err) {
     showToast(err.message || "Error cargando libros", "error");
   } finally {
@@ -127,8 +131,15 @@ form.addEventListener("submit", async (e) => {
     if (res.ok) {
       form.reset();
       inputId.value = "";
+      // Intentamos obtener el id del libro creado/actualizado para resaltarlo
+      let highlightId = null;
+      try {
+        const json = await res.json().catch(() => null);
+        if (json && (json.id || json.insertId)) highlightId = json.id || json.insertId;
+      } catch (e) { /* ignore */ }
+      if (isEdit && !highlightId) highlightId = id;
       showToast(isEdit ? "Libro actualizado" : "Libro agregado", "success");
-      await loadBooks();
+      await loadBooks(highlightId);
     } else {
       const { message } = await res.json().catch(() => ({ message: "Error" }));
       showToast(message || "Ocurrió un error", "error");
@@ -150,12 +161,13 @@ searchInput?.addEventListener("input", () => loadBooks());
 function showToast(message, type = "success", timeout = 3500) {
   if (!toastContainer) return alert(message);
   const t = document.createElement("div");
-  t.className = `toast ${type === 'error' ? 'error' : 'success'}`;
+  t.className = `toast ${type === 'error' ? 'error' : 'success'} fade-in`;
   t.innerHTML = `<div class="msg">${escapeHtml(message)}</div><div class="close" aria-label="cerrar">&times;</div>`;
   toastContainer.appendChild(t);
-  const closer = () => t.remove();
-  t.querySelector('.close').addEventListener('click', closer);
-  setTimeout(() => { t.remove(); }, timeout);
+  // animación y cierre
+  const closer = () => t.classList.add('fade-out');
+  t.querySelector('.close').addEventListener('click', () => { closer(); setTimeout(() => t.remove(), 450); });
+  setTimeout(() => { closer(); setTimeout(() => t.remove(), 450); }, timeout);
 }
 
 Promise.all([loadAutores(), loadBooks()]);
