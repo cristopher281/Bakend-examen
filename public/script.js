@@ -160,13 +160,40 @@ searchInput?.addEventListener("input", () => loadBooks());
 
 function showToast(message, type = "success", timeout = 3500) {
   if (!toastContainer) return alert(message);
+
+  // Si Bootstrap está disponible, usar su componente Toast (más integrado)
+  if (window.bootstrap && window.bootstrap.Toast) {
+    const toastEl = document.createElement('div');
+    // usar clases de Bootstrap para fondo según tipo
+    const bgClass = type === 'error' ? 'text-bg-danger' : 'text-bg-success';
+    toastEl.className = `toast ${bgClass} align-items-center app-toast`; 
+    toastEl.setAttribute('role', 'alert');
+    toastEl.setAttribute('aria-live', 'polite');
+    toastEl.setAttribute('aria-atomic', 'true');
+    toastEl.innerHTML = `
+      <div class="d-flex">
+        <div class="toast-body">${escapeHtml(message)}</div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+      </div>
+    `;
+    toastContainer.appendChild(toastEl);
+    // Instanciar y mostrar
+    const bsToast = new bootstrap.Toast(toastEl, { autohide: true, delay: timeout });
+    // Cuando termine, eliminar elemento del DOM
+    toastEl.addEventListener('hidden.bs.toast', () => { toastEl.remove(); });
+    bsToast.show();
+    return;
+  }
+
+  // Fallback: implementación simple (previa)
   const t = document.createElement("div");
   t.className = `toast ${type === 'error' ? 'error' : 'success'} fade-in`;
   t.innerHTML = `<div class="msg">${escapeHtml(message)}</div><div class="close" aria-label="cerrar">&times;</div>`;
   toastContainer.appendChild(t);
   // animación y cierre
   const closer = () => t.classList.add('fade-out');
-  t.querySelector('.close').addEventListener('click', () => { closer(); setTimeout(() => t.remove(), 450); });
+  const closeBtn = t.querySelector('.close');
+  if (closeBtn) closeBtn.addEventListener('click', () => { closer(); setTimeout(() => t.remove(), 450); });
   setTimeout(() => { closer(); setTimeout(() => t.remove(), 450); }, timeout);
 }
 
